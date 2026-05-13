@@ -229,7 +229,19 @@ let FILTERS={};// per-page filters
 const R=v=>isNaN(v)||v==null?'—':'R$\u00a0'+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const H=v=>isNaN(v)||v==null?'—':Number(v).toFixed(1)+'h';
 const N=v=>isNaN(v)?'—':Number(v).toLocaleString('pt-BR');
-const cv=s=>{if(!s&&s!==0)return 0;const n=parseFloat(String(s).replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.').replace(/\(/g,'-').replace(/\)/g,''));return isNaN(n)?0:n;};
+const cv=s=>{
+  if(!s&&s!==0)return 0;
+  if(typeof s==='number')return s;
+  const str=String(s).trim().replace(/[R$\s]/g,'');
+  // Formato BR com ponto de milhar: "1.290,03" ou "3.290,03"
+  if(/,\d{1,2}$/.test(str)){
+    const n=parseFloat(str.replace(/\./g,'').replace(',','.').replace(/\(/g,'-').replace(/\)/g,''));
+    return isNaN(n)?0:n;
+  }
+  // Número já com ponto decimal (vindo do Excel como string "3290.03")
+  const n=parseFloat(str.replace(/\(/g,'-').replace(/\)/g,''));
+  return isNaN(n)?0:n;
+};
 const ch=s=>{if(!s)return 0;const n=parseFloat(String(s).replace(',','.'));return isNaN(n)?0:n;};
 const sum=(a,k)=>(a||[]).reduce((s,r)=>s+(Number(r[k])||0),0);
 const grp=(a,k)=>(a||[]).reduce((o,r)=>{const v=r[k]||'—';(o[v]=o[v]||[]).push(r);return o},{});
