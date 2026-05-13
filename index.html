@@ -243,10 +243,13 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
 async function apiCall(action,payload={}){
   try{
     const res=await Promise.race([
-      fetch(API_URL,{method:'POST',body:JSON.stringify({action,payload:{...payload,role:CU?.role,unidades:CU?.unidades}})}),
+      fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action,payload:{...payload,role:CU?.role,unidades:CU?.unidades}})}),
       new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),12000))
     ]);
-    return await res.json();
+    const text=await res.text();
+    if(!text||!text.trim())return{ok:false,error:'Resposta vazia do servidor.'};
+    try{return JSON.parse(text);}
+    catch(pe){console.error('GAS response (não-JSON):',text.slice(0,300));return{ok:false,error:'Resposta inválida do servidor (não-JSON). Verifique os logs do Apps Script.'};}
   }catch(e){return{ok:false,error:e.message};}
 }
 function showSync(on){document.getElementById('sync-bar').classList.toggle('hidden',!on);}
@@ -325,11 +328,6 @@ function canSee(u){if(CU.role==='master')return true;if(!CU.unidades||!CU.unidad
 function filtAccess(rows,f='empregador'){return(rows||[]).filter(r=>canSee(r[f]||r.empregador||''));}
 
 // ── FILTER SYSTEM (multi-select) ──────────────────────────────────
-function setFilter(page,key,val){
-  if(!FILTERS[page])FILTERS[page]={};
-  FILTERS[page][key]=val;
-  go(page);
-}
 function getFilters(page){return FILTERS[page]||{};}
 function clearFilters(page){FILTERS[page]={};closeAllDropdowns();go(page);}
 
@@ -410,14 +408,10 @@ function selectAllFilter(page,key,allVals){
 }
 
 function rerenderContent(page){
-  // re-render only the content div, not the filter bar
-  const contentId={dash:'dash-content',turnover:'tv-content',absenteismo:'abs-content',movimentacao:'mov-content',headcount:'hc-content',encargos:'enc-content',pj:'pj-content',ponto:'pto-content',hextra:'hex-content',faltas:'flt-content'}[page];
-  if(!contentId)return;
-  const el=document.getElementById(contentId);
+  Object.values(Chart.instances||{}).forEach(c=>{try{c.destroy();}catch{}});
+  const el=document.getElementById('pg');
   if(!el)return;
-  // destroy old charts (Chart.js v4 compatible)
-  Object.values(Chart.instances||{}).forEach(c=>{try{c.destroy();}catch(e){}});
-  const renders={dash:renderDashContent,turnover:rTurnover,absenteismo:rAbsenteismo,movimentacao:rMovimentacao,headcount:rHeadcount,encargos:rEncargos,pj:rPJ,ponto:rPonto,hextra:rHextra,faltas:rFaltas};
+  const renders={dash:rDash,turnover:rTurnover,absenteismo:rAbsenteismo,movimentacao:rMovimentacao,headcount:rHeadcount,encargos:rEncargos,terminos:rTerminos,pj:rPJ,ponto:rPonto,hextra:rHextra,faltas:rFaltas};
   if(renders[page])renders[page](el);
 }
 
@@ -444,7 +438,7 @@ function buildFilterBar(page,rows,fields=[]){
     const sel=f[key]||[];
     const btnLabel=sel.length===0?labels[key]:sel.length===1?(sel[0].length>18?sel[0].slice(0,16)+'…':sel[0]):`${labels[key]}: ${sel.length} sel.`;
     return `<div class="ms-wrap">
-      <button id="btn-${page}-${key}" class="ms-btn ${sel.length?'active':''}" onclick="event.stopPropagation();openDropdown('${page}','${key}',${JSON.stringify(allVals)})">${btnLabel}</button>
+      <button id="btn-${page}-${key}" class="ms-btn ${sel.length?'active':''}" onclick="event.stopPropagation();openDropdown('${page}','${key}',JSON.parse(this.dataset.vals))" data-vals="${JSON.stringify(allVals).replace(/"/g,'&quot;')}">${btnLabel}</button>
       <div id="dd-${page}-${key}" class="ms-dropdown hidden">
         <div class="ms-search"><input type="text" placeholder="Buscar..." oninput="renderDropdownOptions(document.getElementById('dd-${page}-${key}'),'${page}','${key}',document.getElementById('dd-${page}-${key}')._allVals||[],this.value)"></div>
         <div class="ms-all" onclick="selectAllFilter('${page}','${key}',document.getElementById('dd-${page}-${key}')._allVals||[])">☑ Selecionar / Desmarcar todos</div>
