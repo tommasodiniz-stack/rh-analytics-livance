@@ -312,10 +312,6 @@ async function loadAndStart(){
   const res=await apiCall('loadAll');
   if(res.ok&&res.data)DB=res.data;
   else{const c=lsGet('rh_db_cache');if(c)DB=c;else DB={};}
-  // Apply local blacklist of deleted periods/modules
-  const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
-  deleted.periods.forEach(mes=>{delete DB[mes];});
-  deleted.modules.forEach(({mes,modulo})=>{if(DB[mes])DB[mes][modulo]=[];});
   initApp();
 }
 function initApp(){
@@ -328,7 +324,24 @@ function initApp(){
   document.getElementById('btn-sync').addEventListener('click',syncNow);
   document.getElementById('btn-modal-cancel').addEventListener('click',closeModal);
   document.getElementById('btn-modal-save').addEventListener('click',saveEdit);
-  sanitizeDB();populateMesSel();go('dash');
+  sanitizeDB();
+  // Apply blacklist AFTER sanitizeDB (so sanitized keys are also matched)
+  const _del=lsGet('rh_deleted')||{periods:[],modules:[]};
+  _del.periods.forEach(mes=>{
+    // Also try to match sanitized variants
+    Object.keys(DB).forEach(k=>{
+      const norm=k.replace(/^(\d{2})\/(\d{4})$/,'$2-$1');
+      if(k===mes||norm===mes){delete DB[k];}
+    });
+  });
+  _del.modules.forEach(({mes,modulo})=>{
+    Object.keys(DB).forEach(k=>{
+      const norm=k.replace(/^(\d{2})\/(\d{4})$/,'$2-$1');
+      if((k===mes||norm===mes)&&DB[k])DB[k][modulo]=[];
+    });
+  });
+  lsSet('rh_db_cache',DB);
+  populateMesSel();go('dash');
 }
 function sanitizeDB(){
   // Fix any key that isn't YYYY-MM format (e.g. from old input[type=month] bug)
