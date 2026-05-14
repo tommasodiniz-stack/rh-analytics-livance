@@ -192,7 +192,7 @@ select:focus,input:focus{border-color:#534AB7}
     <div class="topbar-title" id="pg-title">Dashboard</div>
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-size:11px;color:#999">Período:</label>
-      <select id="mes-global" style="width:100px;font-size:12px;padding:5px 8px;-webkit-appearance:auto;appearance:auto"></select>
+      <select id="mes-global" style="width:90px;font-size:12px;padding:5px 8px"></select>
       <button id="btn-sync" style="padding:5px 10px;font-size:11px;border:0.5px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;color:#534AB7">⟳</button>
     </div>
   </div>
@@ -910,16 +910,16 @@ function rPeriodos(el){
   const modLabels={cadastro:'Dados Cadastrais',encargos:'Encargos',terminos:'Términos',pj:'Dados PJ',ponto:'Ponto'};
   if(!meses.length){noData(el,'Nenhum período importado ainda.');return;}
   el.innerHTML=`<p style="font-size:13px;color:#999;margin-bottom:1rem">Exclusão remove do Google Sheets e não afeta outros meses.</p>
-  ${meses.map(mes=>{const d=DB[mes]||{};const total=Object.values(d).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);return`<div class="period-card"><div class="period-header"><div style="display:flex;align-items:center;gap:10px"><div style="font-size:15px;font-weight:500">${mes}</div><span style="font-size:11px;color:#999">${total} registros</span></div><button onclick="confirmDeletePeriodo('${mes}')" style="padding:5px 12px;font-size:11px;border:0.5px solid #f5c6c6;border-radius:6px;cursor:pointer;background:#fff;color:#c0392b">Excluir período</button></div>${Object.entries(modLabels).map(([k,label])=>{const rows=d[k]||[];return`<div class="module-row"><div style="display:flex;align-items:center;gap:8px"><div class="dot ${rows.length?'dot-ok':'dot-empty'}"></div><span style="font-size:12px;color:${rows.length?'#1a1a18':'#bbb'}">${label}</span><span style="font-size:11px;color:#999">${rows.length?rows.length+' registros':'Não importado'}</span></div>${rows.length?`<button onclick="confirmDeleteModulo('${mes}','${k}','${label}')" class="btn-sm red" style="font-size:10px;padding:3px 8px">Excluir módulo</button>`:''}</div>`;}).join('')}</div>`;}).join('')}`;
+  ${meses.map(mes=>{const d=DB[mes]||{};const total=Object.values(d).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);return`<div class="period-card"><div class="period-header"><div style="display:flex;align-items:center;gap:10px"><div style="font-size:15px;font-weight:500">${fmtMes(mes)}</div><span style="font-size:11px;color:#999">${total} registros</span></div><button onclick="confirmDeletePeriodo('${mes}')" style="padding:5px 12px;font-size:11px;border:0.5px solid #f5c6c6;border-radius:6px;cursor:pointer;background:#fff;color:#c0392b">Excluir período</button></div>${Object.entries(modLabels).map(([k,label])=>{const rows=d[k]||[];return`<div class="module-row"><div style="display:flex;align-items:center;gap:8px"><div class="dot ${rows.length?'dot-ok':'dot-empty'}"></div><span style="font-size:12px;color:${rows.length?'#1a1a18':'#bbb'}">${label}</span><span style="font-size:11px;color:#999">${rows.length?rows.length+' registros':'Não importado'}</span></div>${rows.length?`<button onclick="confirmDeleteModulo('${mes}','${k}','${label}')" class="btn-sm red" style="font-size:10px;padding:3px 8px">Excluir módulo</button>`:''}</div>`;}).join('')}</div>`;}).join('')}`;
 }
 async function confirmDeletePeriodo(mes){
-  if(!confirm(`⚠ Excluir TODOS os dados de ${mes}?`))return;
+  if(!confirm(`⚠ Excluir TODOS os dados de ${fmtMes(mes)}?`))return;
   showSync(true);const res=await apiCall('deletePeriod',{mes});
   if(res.ok){delete DB[mes];lsSet('rh_db_cache',DB);populateMesSel();const m=getMeses();MES=m.length?m[0]:'';}
   else alert('Erro: '+res.error);showSync(false);rPeriodos(document.getElementById('pg'));
 }
 async function confirmDeleteModulo(mes,modulo,label){
-  if(!confirm(`⚠ Excluir "${label}" de ${mes}?`))return;
+  if(!confirm(`⚠ Excluir "${label}" de ${fmtMes(mes)}?`))return;
   showSync(true);const res=await apiCall('deleteModule',{mes,modulo});
   if(res.ok){if(DB[mes])DB[mes][modulo]=[];lsSet('rh_db_cache',DB);}
   else alert('Erro: '+res.error);showSync(false);rPeriodos(document.getElementById('pg'));
