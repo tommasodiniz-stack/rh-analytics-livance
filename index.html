@@ -268,11 +268,11 @@ function lsGet(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch{r
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
 
 // ── API ───────────────────────────────────────────────────────────
-async function apiCall(action,payload={}){
+async function apiCall(action,payload={},timeoutMs=12000){
   try{
     const res=await Promise.race([
       fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action,payload:{...payload,role:CU?.role,unidades:CU?.unidades}})}),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),12000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),timeoutMs))
     ]);
     const text=await res.text();
     if(!text||!text.trim())return{ok:false,error:'Resposta vazia do servidor.'};
@@ -982,9 +982,9 @@ async function confirmDeletePeriodo(mes){
   const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
   if(!deleted.periods.includes(mes))deleted.periods.push(mes);
   lsSet('rh_deleted',deleted);
-  const res=await apiCall('deletePeriod',{mes});
-  if(res.ok){delete DB[mes];lsSet('rh_db_cache',DB);populateMesSel();const m=getMeses();MES=m.length?m[0]:'';}
-  else alert('Erro ao excluir no servidor (período removido localmente): '+res.error);
+  const res=await apiCall('deletePeriod',{mes},30000);
+  delete DB[mes];lsSet('rh_db_cache',DB);populateMesSel();const m=getMeses();MES=m.length?m[0]:'';
+  if(!res.ok)console.warn('Erro ao excluir no servidor (removido localmente):',res.error);
   showSync(false);rPeriodos(document.getElementById('pg'));
 }
 async function confirmDeleteModulo(mes,modulo,label){
@@ -994,9 +994,9 @@ async function confirmDeleteModulo(mes,modulo,label){
   const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
   if(!deleted.modules.find(x=>x.mes===mes&&x.modulo===modulo))deleted.modules.push({mes,modulo});
   lsSet('rh_deleted',deleted);
-  const res=await apiCall('deleteModule',{mes,modulo});
-  if(res.ok){if(DB[mes])DB[mes][modulo]=[];lsSet('rh_db_cache',DB);}
-  else alert('Erro ao excluir no servidor (módulo removido localmente): '+res.error);
+  const res=await apiCall('deleteModule',{mes,modulo},30000);
+  if(DB[mes])DB[mes][modulo]=[];lsSet('rh_db_cache',DB);
+  if(!res.ok)console.warn('Erro ao excluir módulo no servidor (removido localmente):',res.error);
   showSync(false);rPeriodos(document.getElementById('pg'));
 }
 
