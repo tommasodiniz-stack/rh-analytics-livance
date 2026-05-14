@@ -132,7 +132,7 @@ select:focus,input:focus{border-color:#534AB7}
 .sync-bar{background:#EEEDFE;border-bottom:0.5px solid #AFA9EC;padding:6px 1.5rem;font-size:11px;color:#534AB7;display:flex;align-items:center;gap:8px}
 /* ANUAL */
 .ano-header{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap}
-.ano-sel{padding:6px 12px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;background:#fff;outline:none;width:120px}
+.ano-sel{padding:6px 12px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;background:#fff;outline:none;width:auto;min-width:80px;cursor:pointer;-webkit-appearance:auto;appearance:auto}
 .ano-badge{background:#EEEDFE;color:#534AB7;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
 </style>
 </head>
@@ -192,7 +192,7 @@ select:focus,input:focus{border-color:#534AB7}
     <div class="topbar-title" id="pg-title">Dashboard</div>
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-size:11px;color:#999">Período:</label>
-      <select id="mes-global" style="width:120px;font-size:12px;padding:5px 8px"></select>
+      <select id="mes-global" style="width:100px;font-size:12px;padding:5px 8px;-webkit-appearance:auto;appearance:auto"></select>
       <button id="btn-sync" style="padding:5px 10px;font-size:11px;border:0.5px solid #ddd;border-radius:6px;cursor:pointer;background:#fff;color:#534AB7">⟳</button>
     </div>
   </div>
@@ -229,6 +229,7 @@ let FILTERS={};// per-page filters
 const R=v=>isNaN(v)||v==null?'—':'R$\u00a0'+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const H=v=>isNaN(v)||v==null?'—':Number(v).toFixed(1)+'h';
 const N=v=>isNaN(v)?'—':Number(v).toLocaleString('pt-BR');
+const fmtMes=m=>{if(!m)return'';const[y,mo]=String(m).split('-');return`${mo}/${y}`;};
 const cv=s=>{
   if(!s&&s!==0)return 0;
   if(typeof s==='number')return s;
@@ -328,7 +329,7 @@ function initApp(){
 function populateMesSel(){
   const sel=document.getElementById('mes-global');
   const meses=Object.keys(DB).sort().reverse();
-  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${m}</option>`).join(''):'<option value="">Sem dados</option>';
+  sel.innerHTML=meses.length?meses.map(m=>`<option value="${m}">${fmtMes(m)}</option>`).join(''):'<option value="">Sem dados</option>';
   MES=meses.length?meses[0]:'';
 }
 async function syncNow(){
