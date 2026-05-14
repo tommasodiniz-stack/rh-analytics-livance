@@ -148,7 +148,6 @@ select:focus,input:focus{border-color:#534AB7}
     <div class="login-err" id="lerr"></div>
     <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:0.5px solid #eee;text-align:center">
       <div style="font-size:11px;color:#bbb;margin-bottom:.6rem">Quer explorar sem importar dados?</div>
-      <button onclick="loadDemo()" style="width:100%;padding:9px;background:#f5f5f0;border:0.5px solid #e0e0e0;border-radius:8px;font-size:13px;color:#534AB7;cursor:pointer;font-weight:500">🎲 Carregar dados de demonstração</button>
     </div>
   </div>
 </div>
@@ -959,37 +958,6 @@ async function removeUser(email){
 }
 
 // ── DEMO ──────────────────────────────────────────────────────────
-function loadDemo(){
-  const unidades=['Livance - Liv','Livance - Vila Mariana','Livance - Perdizes','Livance - Pinheiros','Livance - Paulista','Livance - Brigadeiro','Livance - Botafogo','Livance - Alphaville','Livance - Santo André','Livance - Santos','Livance - Campinas','Livance - Moema','Livance - Itaim','Livance - Tatuapé'];
-  const depts=['Sucesso do Membro','Limpeza','Atendimento ao Paciente','Vendas','Financeiro','People','Marketing','Tech','Logística','Retenção'];
-  const ccs=['CC-001 Operações','CC-002 Vendas','CC-003 Tech','CC-004 RH','CC-005 Financeiro','CC-006 Limpeza','CC-007 Marketing','CC-008 Logística'];
-  const cargos=['Especialista em Sucesso do Membro I','Especialista em Sucesso do Membro II','Líder em Sucesso do Membro I','Auxiliar de Serviços Gerais','Secretário(a)','Vendedor(a) I','Vendedor(a) II','Analista Financeiro','Analista de Marketing I','Supervisor(a) de Limpeza'];
-  const nomes=['Ana Paula Silva','Bruno Oliveira','Carla Santos','Diego Mendes','Eduarda Costa','Felipe Souza','Gabriela Lima','Henrique Rocha','Isabela Ferreira','João Pedro Alves','Larissa Melo','Marcos Viana','Natalia Castro','Otavio Ribeiro','Patricia Gomes','Rafael Cunha','Sandra Felix','Thiago Ramos','Ursula Costa','Vinicius Lopes','Amanda Rodrigues','Beatriz Nunes','Carlos Eduardo','Daniele Freitas','Eliana Porto','Fabio Medeiros','Giovana Souza','Hugo Martins','Iris Santos','Julio Cesar'];
-  const nomesPJ=['Lucas Meirelles','Marina Chene','Pedro Arantes','Rodrigo Braga','Danilo Pontes','Jessyca Pelisson','Andressa Mendonça','Rafael Silva','Juliano Cruz','Thais Patricio'];
-  const rand=arr=>arr[Math.floor(Math.random()*arr.length)];
-  const randN=(min,max)=>+(Math.random()*(max-min)+min).toFixed(2);
-  const meses=['2026-02','2026-03','2026-04'];
-  DB={};
-  meses.forEach((mes,mi)=>{
-    const cadastro=nomes.map((nome,i)=>{const dept=rand(depts);return{mes,matricula:String(8000+i),nome,tipoPessoa:'CLT',cargo:rand(cargos),departamento:dept,centroCusto:rand(ccs),empregador:rand(unidades),situacao:Math.random()>0.1?'Ativo':'Afastado',dataAdmissao:`0${Math.floor(Math.random()*9)+1}/0${Math.floor(Math.random()*9)+1}/202${Math.floor(Math.random()*4)+1}`,salarioBase:randN(1980,9000)};});
-    ponto_arr.forEach(p=>{const c=cadastro.find(x=>x.matricula===p.matricula)||{};p.cargo=c.cargo||'';p.departamento=c.departamento||'';p.centroCusto=c.centroCusto||'';p.empregador=c.empregador||'';});
-    const encargos=cadastro.map(r=>{const base=r.salarioBase*randN(1.0,1.15);const fgts=+(base*0.08).toFixed(2);const econs=Math.random()>0.7?+(base*randN(0.05,0.25)).toFixed(2):0;return{mes,matricula:r.matricula,nome:r.nome,departamento:r.departamento,centroCusto:r.centroCusto,empregador:r.empregador,tipoFolha:'Mensal',baseCalculo:+base.toFixed(2),fgts,fgtsRescisorio:0,econsignado:econs,fgtsTotal:+(fgts+econs).toFixed(2)};});
-    const terminos=[];
-    if(mi>0){
-      const condicoes=['Sem justa causa','Pedido de demissão','Rescisão Antecipada do Contrato de Experiência pelo Empregado','Sem justa causa','Pedido de demissão'];
-      for(let t=0;t<Math.floor(Math.random()*4)+2;t++){const c=rand(cadastro);const liq=randN(3000,15000);const multa=+(liq*0.4).toFixed(2);const fgtsR=+(liq*0.08).toFixed(2);terminos.push({mes,matricula:c.matricula,nome:c.nome,tipoPessoa:'CLT',cargo:c.cargo,departamento:c.departamento,centroCusto:c.centroCusto,empregador:c.empregador,dataAdmissao:c.dataAdmissao,dataTermino:`1${Math.floor(Math.random()*9)}/0${mi+3}/2026`,condicao:rand(condicoes),tipoAviso:rand(['Indenizado','Trabalhado','Dispensado']),multaFGTS:multa,fgtsRescisorio:fgtsR,grrf:+(fgtsR*0.5).toFixed(2),liquidoRescisorio:+liq.toFixed(2),honorariosAberto:0,recesso:0,custoTotalCLT:+(liq+multa+fgtsR).toFixed(2),custoTotalPJ:0});}
-      const hon=randN(5000,20000);const rec=randN(1000,4000);
-      terminos.push({mes,matricula:'5'+(Math.floor(Math.random()*200)+1),nome:rand(nomesPJ),tipoPessoa:'PJ',cargo:'Gerente de Projetos',departamento:rand(depts),centroCusto:rand(ccs),empregador:'Livance - Liv',dataAdmissao:'01/01/2023',dataTermino:`2${Math.floor(Math.random()*8)}/0${mi+3}/2026`,condicao:'Distrato',tipoAviso:'—',multaFGTS:0,fgtsRescisorio:0,grrf:0,liquidoRescisorio:0,honorariosAberto:+hon.toFixed(2),recesso:+rec.toFixed(2),custoTotalCLT:0,custoTotalPJ:+(hon+rec).toFixed(2)});
-    }
-    const pj=nomesPJ.map((nome,i)=>({mes,matricula:String(5001+i),nome,cpf:'',cnpj:`${String(Math.floor(Math.random()*90000000+10000000)).slice(0,8)}/0001-${Math.floor(Math.random()*90+10)}`,razaoSocial:nome.split(' ').slice(0,2).join(' ')+' LTDA',cargo:['Diretor de Tech','Head de Vendas','Gerente Financeiro','Tech Lead','Product Manager','Head of Legal','Designer Senior','Analista de Dados'][i%8],departamento:rand(depts),centroCusto:rand(ccs),empregador:'Livance - Liv',regimeTributario:Math.random()>0.3?'Simples':'Lucro presumido',honorarios:randN(8000,40000),dataInicio:'01/01/202'+Math.floor(Math.random()*4+1),situacao:'Ativo'}));
-    const ponto=cadastro.map(r=>{const prev=randN(140,180);const trab=prev*randN(0.85,1.05);const hExtra=Math.random()>0.6?randN(1,25):0;const hAtraso=Math.random()>0.7?randN(0.5,5):0;const faltas=Math.random()>0.8?Math.floor(Math.random()*5)+1:0;const adicNot=Math.random()>0.8?randN(0.5,5):0;const diasPrev=Math.round(prev/8);const diasTrab=Math.max(1,diasPrev-faltas);return{mes,matricula:r.matricula,nome:r.nome,codigo:r.matricula,localTrabalho:r.empregador,centroCusto:r.centroCusto,departamento:r.departamento,cargo:r.cargo,tipoPessoa:r.tipoPessoa,adicNoturno:+adicNot.toFixed(1),hExtra:+hExtra.toFixed(1),hExtraNot:+(hExtra*0.2).toFixed(1),hAtraso:+hAtraso.toFixed(1),hTrabalhadas:+trab.toFixed(1),hPrevistas:+prev.toFixed(1),hDispensas:Math.random()>0.8?+randN(1,8).toFixed(1):0,diasTrab,diasPrev,faltas};});
-    DB[mes]={cadastro,encargos,terminos,pj,ponto};
-  });
-  lsSet('rh_db_cache',DB);
-  CU={role:'master',name:'Demo'};
-  initApp();
-}
-
 // ── INIT ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
   // Garante que login-screen começa visível e os outros ocultos
