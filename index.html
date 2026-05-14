@@ -507,7 +507,7 @@ function renderDashContent(el){
   const termPJ=term.filter(r=>r.tipoPessoa==='PJ');
   el.innerHTML=`
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">CLT ativos</div><div class="kpi-val">${clt.filter(r=>r.situacao==='Ativo').length}</div><div class="kpi-sub">de ${clt.length} no cadastro</div></div>
+    <div class="kpi"><div class="kpi-label">CLT ativos</div><div class="kpi-val">${clt.filter(r=>r.situacao==='Ativo').length}</div><div class="kpi-sub">de ${clt.length} no cadastro</div></div><div class="kpi"><div class="kpi-label">CLT afastados</div><div class="kpi-val" style="color:#BA7517">${clt.filter(r=>r.situacao==='Afastado').length}</div><div class="kpi-sub">licença / INSS</div></div>
     <div class="kpi"><div class="kpi-label">Prestadores PJ</div><div class="kpi-val">${pjList.length}</div></div>
     <div class="kpi"><div class="kpi-label">Massa salarial CLT</div><div class="kpi-val" style="font-size:15px">${R(sum(clt,'salarioBase'))}</div></div>
     <div class="kpi"><div class="kpi-label">FGTS mensal</div><div class="kpi-val" style="font-size:15px">${R(sum(enc,'fgtsTotal'))}</div></div>
@@ -549,6 +549,8 @@ function rAnual(el){
   const custoTermCLT=mesesAno.map(m=>sum(getMesData(m).terminos.filter(r=>r.tipoPessoa==='CLT'),'custoTotalCLT'));
   const custoTermPJ=mesesAno.map(m=>sum(getMesData(m).terminos.filter(r=>r.tipoPessoa==='PJ'),'custoTotalPJ'));
   const headcount=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Ativo').length);
+  const afastados=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Afastado').length);
+  const totalVinculos=mesesAno.map((m,i)=>headcount[i]+afastados[i]);
   const admissoes=mesesAno.map((m,i)=>{
     if(i===0)return 0;
     const ant=getMesData(mesesAno[i-1]).cadastro.map(r=>r.matricula);
@@ -590,7 +592,7 @@ function rAnual(el){
 
   <div class="two-col">
     <div class="card"><div class="card-title">Custo total mensal — CLT + PJ + Términos</div><div class="chart-tall"><canvas id="an2"></canvas></div></div>
-    <div class="card"><div class="card-title">Headcount CLT ativo</div><div class="chart-tall"><canvas id="an3"></canvas></div></div>
+    <div class="card"><div class="card-title">Headcount CLT — Ativos vs Afastados</div><div class="chart-tall"><canvas id="an3"></canvas></div></div>
   </div>
 
   <div class="two-col">
@@ -601,19 +603,23 @@ function rAnual(el){
   <div class="card"><div class="card-title">Composição de custo mensal</div><div class="chart-tall"><canvas id="an6"></canvas></div></div>
 
   <div class="card"><div class="card-title">Resumo mensal detalhado — ${anoSel}</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Mês</th><th>Headcount</th><th>Admissões</th><th>Saídas</th><th>Massa Salarial</th><th>FGTS</th><th>Custo PJ</th><th>Custo Términos</th><th>H. Extras</th><th>Faltas (dias)</th></tr></thead>
+  <div class="tbl-wrap"><table><thead><tr><th>Mês</th><th>Ativos</th><th>Afastados</th><th>Admissões</th><th>Saídas</th><th>Massa Salarial</th><th>FGTS</th><th>Custo PJ</th><th>Custo Términos</th><th>H. Extras</th><th>Faltas (dias)</th></tr></thead>
   <tbody>${mesesAno.map((m,i)=>{
     const [y,mo]=m.split('-');
     const label=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(mo)-1];
-    return`<tr><td style="font-weight:500">${label}</td><td>${headcount[i]}</td><td style="color:#1D9E75;font-weight:500">+${admissoes[i]}</td><td style="color:#c0392b;font-weight:500">-${saidas[i]}</td><td>${R(massaSal[i])}</td><td>${R(totalFGTS[i])}</td><td>${R(custoPJ[i])}</td><td style="color:#c0392b">${R(custoTermCLT[i]+custoTermPJ[i])}</td><td>${H(hExtras[i])}</td><td>${faltas[i]}</td></tr>`;
+    return`<tr><td style="font-weight:500">${label}</td><td>${headcount[i]}</td><td style="color:#BA7517;font-weight:500">${afastados[i]}</td><td style="color:#1D9E75;font-weight:500">+${admissoes[i]}</td><td style="color:#c0392b;font-weight:500">-${saidas[i]}</td><td>${R(massaSal[i])}</td><td>${R(totalFGTS[i])}</td><td>${R(custoPJ[i])}</td><td style="color:#c0392b">${R(custoTermCLT[i]+custoTermPJ[i])}</td><td>${H(hExtras[i])}</td><td>${faltas[i]}</td></tr>`;
   }).join('')}
-  <tr style="font-weight:600;background:#fafaf8"><td>TOTAL</td><td>—</td><td style="color:#1D9E75">+${totalAdm}</td><td style="color:#c0392b">-${totalSai}</td><td>${R(totalMassaAno)}</td><td>${R(totalFGTS.reduce((s,v)=>s+v,0))}</td><td>${R(custoPJ.reduce((s,v)=>s+v,0))}</td><td style="color:#c0392b">${R(totalCustoTermAno)}</td><td>${H(totalHE)}</td><td>${faltas.reduce((s,v)=>s+v,0)}</td></tr>
+  <tr style="font-weight:600;background:#fafaf8"><td>TOTAL</td><td>—</td><td>—</td><td style="color:#1D9E75">+${totalAdm}</td><td style="color:#c0392b">-${totalSai}</td><td>${R(totalMassaAno)}</td><td>${R(totalFGTS.reduce((s,v)=>s+v,0))}</td><td>${R(custoPJ.reduce((s,v)=>s+v,0))}</td><td style="color:#c0392b">${R(totalCustoTermAno)}</td><td>${H(totalHE)}</td><td>${faltas.reduce((s,v)=>s+v,0)}</td></tr>
   </tbody></table></div></div>`;
 
   // Charts
   lineChart('an1',labels,[{label:'Massa Salarial',data:massaSal,borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,.1)',tension:.3,pointRadius:4,fill:true}]);
   multiBarChart('an2',labels,[{label:'Massa Salarial',data:massaSal,backgroundColor:'#AFA9EC'},{label:'FGTS',data:totalFGTS,backgroundColor:'#5DCAA5'},{label:'Custo PJ',data:custoPJ,backgroundColor:'#F0997B'},{label:'Términos',data:custoTermCLT.map((v,i)=>v+custoTermPJ[i]),backgroundColor:'#E24B4A'}]);
-  lineChart('an3',labels,[{label:'Headcount CLT',data:headcount,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.1)',tension:.3,pointRadius:4,fill:true}]);
+  lineChart('an3',labels,[
+    {label:'Ativos',data:headcount,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.1)',tension:.3,pointRadius:4,fill:true},
+    {label:'Afastados',data:afastados,borderColor:'#F0997B',backgroundColor:'rgba(240,153,123,.1)',tension:.3,pointRadius:4,fill:false},
+    {label:'Total vínculos',data:totalVinculos,borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,.05)',tension:.3,pointRadius:4,borderDash:[4,3],fill:false}
+  ]);
   multiBarChart('an4',labels,[{label:'Admissões',data:admissoes,backgroundColor:'#1D9E75'},{label:'Saídas',data:saidas,backgroundColor:'#E24B4A'}]);
   multiBarChart('an5',labels,[{label:'H. Extras',data:hExtras,backgroundColor:'#F0997B'},{label:'Faltas (dias)',data:faltas,backgroundColor:'#E24B4A'}]);
   // Stacked cost
@@ -730,7 +736,15 @@ function rHeadcount(el){
   const allCad=filtAccess(getMesData(MES).cadastro);
   el.innerHTML=buildFilterBar('headcount',allCad,['cc','dept','cargo','tipo','unidade'])+`<div id="hc-content"></div>`;
   const clt=applyFilters(allCad,'headcount');
+  const nAtivos=clt.filter(r=>r.situacao==='Ativo').length;
+  const nAfastados=clt.filter(r=>r.situacao==='Afastado').length;
+  const nTotal=clt.length;
   document.getElementById('hc-content').innerHTML=`
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);max-width:600px">
+    <div class="kpi"><div class="kpi-label">Ativos</div><div class="kpi-val" style="color:#1D9E75">${nAtivos}</div><div class="kpi-sub">em atividade normal</div></div>
+    <div class="kpi"><div class="kpi-label">Afastados</div><div class="kpi-val" style="color:#BA7517">${nAfastados}</div><div class="kpi-sub">licença / INSS</div></div>
+    <div class="kpi"><div class="kpi-label">Total vínculos CLT</div><div class="kpi-val">${nTotal}</div><div class="kpi-sub">ativos + afastados</div></div>
+  </div>
   <div class="flex-row"><input type="text" id="hcf" placeholder="Buscar nome..." style="width:250px" oninput="renderHcTable()"><select id="hcs" onchange="renderHcTable()" style="width:140px"><option value="">Todas situações</option><option>Ativo</option><option>Afastado</option></select></div>
   <div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between"><span>Colaboradores — ${MES}</span><span style="font-size:11px;color:#999;font-weight:400">Clique em Editar para ajustar</span></div>
   <div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Departamento</th><th>C. Custo</th><th>Unidade</th><th>Admissão</th><th>Salário Base</th><th>Tipo</th><th>Situação</th><th></th></tr></thead>
