@@ -243,6 +243,21 @@ const cv=s=>{
   return isNaN(n)?0:n;
 };
 const ch=s=>{if(!s)return 0;const n=parseFloat(String(s).replace(',','.'));return isNaN(n)?0:n;};
+function parseExcelDate(v){
+  if(!v&&v!==0)return '';
+  // Já está no formato dd/mm/aaaa ou aaaa-mm-dd
+  if(typeof v==='string'&&/\d{2}\/\d{2}\/\d{4}/.test(v.trim()))return v.trim();
+  if(typeof v==='string'&&/\d{4}-\d{2}-\d{2}/.test(v.trim())){const[y,m,d]=v.trim().split('-');return`${d}/${m}/${y}`;}
+  // Número serial do Excel (dias desde 1900-01-00, com bug do 1900 como bissexto)
+  const serial=typeof v==='number'?v:parseFloat(v);
+  if(isNaN(serial))return String(v);
+  const utc=new Date(Date.UTC(1899,11,30));
+  utc.setUTCDate(utc.getUTCDate()+serial);
+  const d=String(utc.getUTCDate()).padStart(2,'0');
+  const m=String(utc.getUTCMonth()+1).padStart(2,'0');
+  const y=utc.getUTCFullYear();
+  return`${d}/${m}/${y}`;
+}
 const sum=(a,k)=>(a||[]).reduce((s,r)=>s+(Number(r[k])||0),0);
 const grp=(a,k)=>(a||[]).reduce((o,r)=>{const v=r[k]||'—';(o[v]=o[v]||[]).push(r);return o},{});
 const gv=(r,...keys)=>{for(const k of keys){if(r[k]!=null&&r[k]!=='')return r[k];}return '';};
@@ -850,10 +865,10 @@ function rImportar(el){
 function pickFile(k,inp){if(!inp.files[0])return;F[k]=inp.files[0];rImportar(document.getElementById('pg'));}
 function downloadTemplate(k){const m=MODELOS[k];const ws=XLSX.utils.aoa_to_sheet([m.cols]);ws['!cols']=m.cols.map(()=>({wch:24}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,m.label);XLSX.writeFile(wb,`modelo_${k}_livance.xlsx`);}
 function readXlsx(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];res(XLSX.utils.sheet_to_json(ws));};r.onerror=rej;r.readAsArrayBuffer(file);});}
-function parseCad(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),cpf:gv(r,'CPF'),tipoPessoa:'CLT',cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),centroCusto:gv(r,'Centro de custo'),empregador:gv(r,'Empregador (Unidade)','Empregador'),situacao:gv(r,'Situacao')||'Ativo',dataAdmissao:gv(r,'Data de admissao'),salarioBase:cv(gv(r,'Salario base'))}));}
+function parseCad(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),cpf:gv(r,'CPF'),tipoPessoa:'CLT',cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),centroCusto:gv(r,'Centro de custo'),empregador:gv(r,'Empregador (Unidade)','Empregador'),situacao:gv(r,'Situacao')||'Ativo',dataAdmissao:parseExcelDate(gv(r,'Data de admissao')),salarioBase:cv(gv(r,'Salario base'))}));}
 function parseEnc(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),tipoFolha:gv(r,'Tipo de folha')||'Mensal',baseCalculo:cv(gv(r,'Base de calculo')),fgts:cv(gv(r,'FGTS')),fgtsRescisorio:cv(gv(r,'FGTS rescisorio')),econsignado:cv(gv(r,'eConsignado')),fgtsTotal:cv(gv(r,'Total FGTS'))}));}
-function parseTerm(rows,mes){return rows.map(r=>{const tipo=String(gv(r,'Tipo de pessoa')||'CLT').toUpperCase().includes('PJ')?'PJ':'CLT';const liq=cv(gv(r,'Liquido rescisorio'));const multa=cv(gv(r,'Multa FGTS'));const fgtsR=cv(gv(r,'FGTS rescisorio'));const grrf=cv(gv(r,'GRRF'));const hon=cv(gv(r,'Honorarios em aberto'));const rec=cv(gv(r,'Recesso'));return{mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),tipoPessoa:tipo,cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),dataAdmissao:gv(r,'Data de admissao'),dataTermino:gv(r,'Data de termino'),condicao:gv(r,'Condicao'),tipoAviso:gv(r,'Tipo de aviso'),multaFGTS:multa,fgtsRescisorio:fgtsR,grrf,liquidoRescisorio:liq,honorariosAberto:hon,recesso:rec,custoTotalCLT:tipo==='CLT'?liq+multa+fgtsR+grrf:0,custoTotalPJ:tipo==='PJ'?hon+rec:0};});}
-function parsePJ(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),cpf:gv(r,'CPF'),cnpj:gv(r,'CNPJ'),razaoSocial:gv(r,'Razao social'),cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),regimeTributario:gv(r,'Regime tributario'),honorarios:cv(gv(r,'Honorarios')),dataInicio:gv(r,'Data inicio contrato'),situacao:gv(r,'Situacao')||'Ativo'}));}
+function parseTerm(rows,mes){return rows.map(r=>{const tipo=String(gv(r,'Tipo de pessoa')||'CLT').toUpperCase().includes('PJ')?'PJ':'CLT';const liq=cv(gv(r,'Liquido rescisorio'));const multa=cv(gv(r,'Multa FGTS'));const fgtsR=cv(gv(r,'FGTS rescisorio'));const grrf=cv(gv(r,'GRRF'));const hon=cv(gv(r,'Honorarios em aberto'));const rec=cv(gv(r,'Recesso'));return{mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),tipoPessoa:tipo,cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),dataAdmissao:parseExcelDate(gv(r,'Data de admissao')),dataTermino:parseExcelDate(gv(r,'Data de termino')),condicao:gv(r,'Condicao'),tipoAviso:gv(r,'Tipo de aviso'),multaFGTS:multa,fgtsRescisorio:fgtsR,grrf,liquidoRescisorio:liq,honorariosAberto:hon,recesso:rec,custoTotalCLT:tipo==='CLT'?liq+multa+fgtsR+grrf:0,custoTotalPJ:tipo==='PJ'?hon+rec:0};});}
+function parsePJ(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),cpf:gv(r,'CPF'),cnpj:gv(r,'CNPJ'),razaoSocial:gv(r,'Razao social'),cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),regimeTributario:gv(r,'Regime tributario'),honorarios:cv(gv(r,'Honorarios')),dataInicio:parseExcelDate(gv(r,'Data inicio contrato')),situacao:gv(r,'Situacao')||'Ativo'}));}
 function parsePto(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),codigo:String(gv(r,'Matricula')),localTrabalho:gv(r,'Local de trabalho'),adicNoturno:ch(gv(r,'Adic noturno (h)')),hExtra:ch(gv(r,'H extras (h)')),hExtraNot:ch(gv(r,'H extras noturnas (h)')),hAtraso:ch(gv(r,'H atraso (h)')),hTrabalhadas:ch(gv(r,'H trabalhadas (h)')),hPrevistas:ch(gv(r,'H previstas (h)')),hDispensas:ch(gv(r,'H dispensas (h)')),diasTrab:Number(gv(r,'Dias trabalhados'))||0,diasPrev:Number(gv(r,'Dias previstos'))||0,faltas:Number(gv(r,'Faltas (dias)'))||0}));}
 async function processImport(){
   const mes=document.getElementById('imp-mes')?.value||'';
