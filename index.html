@@ -809,11 +809,16 @@ function rPJ(el){
 }
 
 // ── PONTO ─────────────────────────────────────────────────────────
+function enrichPto(ptoArr,cadArr){
+  const cadMap={};cadArr.forEach(c=>{cadMap[String(c.matricula)]=c;});
+  return ptoArr.map(r=>{const c=cadMap[String(r.matricula)]||{};return{...r,cargo:r.cargo||c.cargo||'',departamento:r.departamento||c.departamento||'',centroCusto:r.centroCusto||c.centroCusto||'',empregador:r.empregador||c.empregador||'',tipoPessoa:c.tipoPessoa||'CLT'};});
+}
 function rPonto(el){
   if(!MES){noData(el);return;}
-  const allPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
+  const rawPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
   const allCad=filtAccess(getMesData(MES).cadastro);
-  el.innerHTML=buildFilterBar('ponto',allCad,['cc','dept','cargo','tipo','unidade'])+`<div id="pto-content"></div>`;
+  const allPto=enrichPto(rawPto,allCad);
+  el.innerHTML=buildFilterBar('ponto',allPto,['cc','dept','cargo','unidade'])+`<div id="pto-content"></div>`;
   const pto=applyFilters(allPto,'ponto');
   if(!pto.length){document.getElementById('pto-content').innerHTML='<div class="empty">Nenhum registro de ponto para os filtros selecionados.</div>';return;}
   const comReg=pto.filter(r=>r.hPrevistas>0);
@@ -833,9 +838,10 @@ function rPonto(el){
 // ── HORAS EXTRAS ──────────────────────────────────────────────────
 function rHextra(el){
   if(!MES){noData(el);return;}
-  const allPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
+  const rawPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
   const allCad=filtAccess(getMesData(MES).cadastro);
-  el.innerHTML=buildFilterBar('hextra',allCad,['cc','dept','cargo','unidade'])+`<div id="hex-content"></div>`;
+  const allPto=enrichPto(rawPto,allCad);
+  el.innerHTML=buildFilterBar('hextra',allPto,['cc','dept','cargo','unidade'])+`<div id="hex-content"></div>`;
   const pto=applyFilters(allPto,'hextra').filter(r=>r.hExtra>0||r.adicNoturno>0);
   document.getElementById('hex-content').innerHTML=`
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)"><div class="kpi"><div class="kpi-label">Com H. Extra</div><div class="kpi-val">${pto.filter(r=>r.hExtra>0).length}</div></div><div class="kpi"><div class="kpi-label">Total H. Extras</div><div class="kpi-val">${H(sum(pto,'hExtra'))}</div></div><div class="kpi"><div class="kpi-label">Adic. Noturno</div><div class="kpi-val">${H(sum(pto,'adicNoturno'))}</div></div><div class="kpi"><div class="kpi-label">Acima de 10h</div><div class="kpi-val" style="color:#c0392b">${pto.filter(r=>r.hExtra>10).length}</div></div></div>
@@ -845,9 +851,10 @@ function rHextra(el){
 // ── FALTAS ────────────────────────────────────────────────────────
 function rFaltas(el){
   if(!MES){noData(el);return;}
-  const allPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
+  const rawPto=filtAccess(getMesData(MES).ponto,'localTrabalho');
   const allCad=filtAccess(getMesData(MES).cadastro);
-  el.innerHTML=buildFilterBar('faltas',allCad,['cc','dept','cargo','unidade'])+`<div id="flt-content"></div>`;
+  const allPto=enrichPto(rawPto,allCad);
+  el.innerHTML=buildFilterBar('faltas',allPto,['cc','dept','cargo','unidade'])+`<div id="flt-content"></div>`;
   const pto=applyFilters(allPto,'faltas').filter(r=>r.faltas>0||r.hAtraso>0);
   document.getElementById('flt-content').innerHTML=`
   <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)"><div class="kpi"><div class="kpi-label">Com falta</div><div class="kpi-val" style="color:#c0392b">${pto.filter(r=>r.faltas>0).length}</div></div><div class="kpi"><div class="kpi-label">Total dias</div><div class="kpi-val" style="color:#c0392b">${sum(pto,'faltas')}</div></div><div class="kpi"><div class="kpi-label">H. Atraso</div><div class="kpi-val">${H(sum(pto,'hAtraso'))}</div></div><div class="kpi"><div class="kpi-label">H. Dispensas</div><div class="kpi-val">${H(sum(pto,'hDispensas'))}</div></div></div>
@@ -855,7 +862,7 @@ function rFaltas(el){
 }
 
 // ── IMPORTAR ──────────────────────────────────────────────────────
-const MODELOS={cad:{num:1,label:'Dados Cadastrais',sub:'Colaboradores CLT',cols:['Matricula','Nome completo','CPF','Tipo de pessoa','Cargo','Departamento','Centro de custo','Empregador (Unidade)','Situacao','Data de admissao','Salario base','Mes de referencia']},enc:{num:2,label:'Encargos',sub:'FGTS mensal e rescisório',cols:['Matricula','Nome completo','Tipo de folha','Departamento','Empregador','Base de calculo','FGTS','FGTS rescisorio','FGTS multa rescisoria','FGTS GRRF','eConsignado','Total FGTS','Mes de referencia']},term:{num:3,label:'Términos',sub:'CLT e PJ',cols:['Matricula','Nome completo','Tipo de pessoa','Cargo','Departamento','Empregador','Data de admissao','Data de termino','Condicao','Tipo de aviso','Tempo de casa (anos)','Salario contratual','Saldo de salario','Aviso previo','Ferias proporcionais','13 proporcional','Multa FGTS','FGTS rescisorio','GRRF','Proventos totais','Deducoes totais','Liquido rescisorio','Honorarios em aberto','Recesso','Mes de referencia']},pj:{num:4,label:'Dados PJ',sub:'Prestadores e honorários',cols:['Matricula','Nome completo','CPF','CNPJ','Razao social','Cargo','Departamento','Empregador','Regime tributario','Honorarios','Data inicio contrato','Situacao','Mes de referencia']},pto:{num:5,label:'Registro de Ponto',sub:'Horas extras, faltas e atrasos',cols:['Matricula','Nome completo','Local de trabalho','Adic noturno (h)','H extras (h)','H extras noturnas (h)','H atraso (h)','H trabalhadas (h)','H previstas (h)','H dispensas (h)','Dias trabalhados','Dias previstos','Faltas (dias)','Mes de referencia']}};
+const MODELOS={cad:{num:1,label:'Dados Cadastrais',sub:'Colaboradores CLT',cols:['Matricula','Nome completo','CPF','Tipo de pessoa','Cargo','Departamento','Centro de custo','Empregador (Unidade)','Situacao','Data de admissao','Salario base','Mes de referencia']},enc:{num:2,label:'Encargos',sub:'FGTS mensal e rescisório',cols:['Matricula','Nome completo','Tipo de folha','Departamento','Empregador','Base de calculo','FGTS','FGTS rescisorio','FGTS multa rescisoria','FGTS GRRF','eConsignado','Total FGTS','Mes de referencia']},term:{num:3,label:'Términos',sub:'CLT e PJ',cols:['Matricula','Nome completo','Tipo de pessoa','Cargo','Departamento','Empregador','Data de admissao','Data de termino','Condicao','Tipo de aviso','Tempo de casa (anos)','Salario contratual','Saldo de salario','Aviso previo','Ferias proporcionais','13 proporcional','Multa FGTS','FGTS rescisorio','GRRF','Proventos totais','Deducoes totais','Liquido rescisorio','Honorarios em aberto','Recesso','Mes de referencia']},pj:{num:4,label:'Dados PJ',sub:'Prestadores e honorários',cols:['Matricula','Nome completo','CPF','CNPJ','Razao social','Cargo','Departamento','Empregador','Regime tributario','Honorarios','Data inicio contrato','Situacao','Mes de referencia']},pto:{num:5,label:'Registro de Ponto',sub:'Horas extras, faltas e atrasos',cols:['Matricula','Nome completo','Cargo','Departamento','Centro de custo','Empregador (Unidade)','Local de trabalho','Adic noturno (h)','H extras (h)','H extras noturnas (h)','H atraso (h)','H trabalhadas (h)','H previstas (h)','H dispensas (h)','Dias trabalhados','Dias previstos','Faltas (dias)','Mes de referencia']}};
 function rImportar(el){
   if(CU.role!=='master'){el.innerHTML='<div class="empty">Apenas o master pode importar dados.</div>';return;}
   el.innerHTML=`<div class="card" style="margin-bottom:1rem"><div class="card-title">Mês de referência</div><div style="display:flex;align-items:center;gap:.75rem"><input type="month" id="imp-mes" value="${new Date().toISOString().slice(0,7)}" style="width:180px"><span style="font-size:12px;color:#999">Os dados serão salvos no Google Sheets da Livance.</span></div></div>
@@ -869,7 +876,7 @@ function parseCad(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matr
 function parseEnc(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),tipoFolha:gv(r,'Tipo de folha')||'Mensal',baseCalculo:cv(gv(r,'Base de calculo')),fgts:cv(gv(r,'FGTS')),fgtsRescisorio:cv(gv(r,'FGTS rescisorio')),econsignado:cv(gv(r,'eConsignado')),fgtsTotal:cv(gv(r,'Total FGTS'))}));}
 function parseTerm(rows,mes){return rows.map(r=>{const tipo=String(gv(r,'Tipo de pessoa')||'CLT').toUpperCase().includes('PJ')?'PJ':'CLT';const liq=cv(gv(r,'Liquido rescisorio'));const multa=cv(gv(r,'Multa FGTS'));const fgtsR=cv(gv(r,'FGTS rescisorio'));const grrf=cv(gv(r,'GRRF'));const hon=cv(gv(r,'Honorarios em aberto'));const rec=cv(gv(r,'Recesso'));return{mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),tipoPessoa:tipo,cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),dataAdmissao:parseExcelDate(gv(r,'Data de admissao')),dataTermino:parseExcelDate(gv(r,'Data de termino')),condicao:gv(r,'Condicao'),tipoAviso:gv(r,'Tipo de aviso'),multaFGTS:multa,fgtsRescisorio:fgtsR,grrf,liquidoRescisorio:liq,honorariosAberto:hon,recesso:rec,custoTotalCLT:tipo==='CLT'?liq+multa+fgtsR+grrf:0,custoTotalPJ:tipo==='PJ'?hon+rec:0};});}
 function parsePJ(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),cpf:gv(r,'CPF'),cnpj:gv(r,'CNPJ'),razaoSocial:gv(r,'Razao social'),cargo:gv(r,'Cargo'),departamento:gv(r,'Departamento'),empregador:gv(r,'Empregador'),regimeTributario:gv(r,'Regime tributario'),honorarios:cv(gv(r,'Honorarios')),dataInicio:parseExcelDate(gv(r,'Data inicio contrato')),situacao:gv(r,'Situacao')||'Ativo'}));}
-function parsePto(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),codigo:String(gv(r,'Matricula')),localTrabalho:gv(r,'Local de trabalho'),adicNoturno:ch(gv(r,'Adic noturno (h)')),hExtra:ch(gv(r,'H extras (h)')),hExtraNot:ch(gv(r,'H extras noturnas (h)')),hAtraso:ch(gv(r,'H atraso (h)')),hTrabalhadas:ch(gv(r,'H trabalhadas (h)')),hPrevistas:ch(gv(r,'H previstas (h)')),hDispensas:ch(gv(r,'H dispensas (h)')),diasTrab:Number(gv(r,'Dias trabalhados'))||0,diasPrev:Number(gv(r,'Dias previstos'))||0,faltas:Number(gv(r,'Faltas (dias)'))||0}));}
+function parsePto(rows,mes){return rows.map(r=>({mes,matricula:String(gv(r,'Matricula')),nome:gv(r,'Nome completo'),codigo:String(gv(r,'Matricula')),cargo:gv(r,'Cargo')||'',departamento:gv(r,'Departamento')||'',centroCusto:gv(r,'Centro de custo')||'',empregador:gv(r,'Empregador (Unidade)','Empregador')||'',localTrabalho:gv(r,'Local de trabalho'),adicNoturno:ch(gv(r,'Adic noturno (h)')),hExtra:ch(gv(r,'H extras (h)')),hExtraNot:ch(gv(r,'H extras noturnas (h)')),hAtraso:ch(gv(r,'H atraso (h)')),hTrabalhadas:ch(gv(r,'H trabalhadas (h)')),hPrevistas:ch(gv(r,'H previstas (h)')),hDispensas:ch(gv(r,'H dispensas (h)')),diasTrab:Number(gv(r,'Dias trabalhados'))||0,diasPrev:Number(gv(r,'Dias previstos'))||0,faltas:Number(gv(r,'Faltas (dias)'))||0}));}
 async function processImport(){
   const mes=document.getElementById('imp-mes')?.value||'';
   const msg=document.getElementById('imp-msg');
@@ -964,6 +971,7 @@ function loadDemo(){
   DB={};
   meses.forEach((mes,mi)=>{
     const cadastro=nomes.map((nome,i)=>{const dept=rand(depts);return{mes,matricula:String(8000+i),nome,tipoPessoa:'CLT',cargo:rand(cargos),departamento:dept,centroCusto:rand(ccs),empregador:rand(unidades),situacao:Math.random()>0.1?'Ativo':'Afastado',dataAdmissao:`0${Math.floor(Math.random()*9)+1}/0${Math.floor(Math.random()*9)+1}/202${Math.floor(Math.random()*4)+1}`,salarioBase:randN(1980,9000)};});
+    ponto_arr.forEach(p=>{const c=cadastro.find(x=>x.matricula===p.matricula)||{};p.cargo=c.cargo||'';p.departamento=c.departamento||'';p.centroCusto=c.centroCusto||'';p.empregador=c.empregador||'';});
     const encargos=cadastro.map(r=>{const base=r.salarioBase*randN(1.0,1.15);const fgts=+(base*0.08).toFixed(2);const econs=Math.random()>0.7?+(base*randN(0.05,0.25)).toFixed(2):0;return{mes,matricula:r.matricula,nome:r.nome,departamento:r.departamento,centroCusto:r.centroCusto,empregador:r.empregador,tipoFolha:'Mensal',baseCalculo:+base.toFixed(2),fgts,fgtsRescisorio:0,econsignado:econs,fgtsTotal:+(fgts+econs).toFixed(2)};});
     const terminos=[];
     if(mi>0){
