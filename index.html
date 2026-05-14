@@ -83,6 +83,7 @@ tr:hover td{background:#fafaf8}
 .b-ok{background:#EAF3DE;color:#3B6D11}
 .b-warn{background:#FAEEDA;color:#854F0B}
 .b-err{background:#FCEBEB;color:#A32D2D}
+.b-purple{background:#F3EAF9;color:#6C2D8E}
 .b-info{background:#EEEDFE;color:#534AB7}
 .b-gray{background:#F1EFE8;color:#5F5E5A}
 .b-teal{background:#E1F5EE;color:#0F6E56}
@@ -208,7 +209,7 @@ select:focus,input:focus{border-color:#534AB7}
     <div class="modal-field"><label>Centro de custo</label><input id="ed-cc" type="text"></div>
     <div class="modal-field"><label>Unidade</label><input id="ed-un" type="text"></div>
     <div class="modal-field"><label>Salário base (R$)</label><input id="ed-sal" type="number" step="0.01"></div>
-    <div class="modal-field"><label>Situação</label><select id="ed-sit"><option>Ativo</option><option>Afastado</option></select></div>
+    <div class="modal-field"><label>Situação</label><select id="ed-sit"><option>Ativo</option><option>Afastado</option><option>Afastado INSS</option><option>Licença Maternidade</option></select></div>
     <div id="ed-msg" class="msg"></div>
     <div class="modal-btns">
       <button class="btn-cancel" id="btn-modal-cancel">Cancelar</button>
@@ -311,6 +312,10 @@ async function loadAndStart(){
   const res=await apiCall('loadAll');
   if(res.ok&&res.data)DB=res.data;
   else{const c=lsGet('rh_db_cache');if(c)DB=c;else DB={};}
+  // Apply local blacklist of deleted periods/modules
+  const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
+  deleted.periods.forEach(mes=>{delete DB[mes];});
+  deleted.modules.forEach(({mes,modulo})=>{if(DB[mes])DB[mes][modulo]=[];});
   initApp();
 }
 function initApp(){
@@ -529,7 +534,7 @@ function renderDashContent(el){
   const termPJ=term.filter(r=>r.tipoPessoa==='PJ');
   el.innerHTML=`
   <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">CLT ativos</div><div class="kpi-val">${clt.filter(r=>r.situacao==='Ativo').length}</div><div class="kpi-sub">de ${clt.length} no cadastro</div></div><div class="kpi"><div class="kpi-label">CLT afastados</div><div class="kpi-val" style="color:#BA7517">${clt.filter(r=>r.situacao==='Afastado').length}</div><div class="kpi-sub">licença / INSS</div></div>
+    <div class="kpi"><div class="kpi-label">Ativos efetivos</div><div class="kpi-val" style="color:#1D9E75">${clt.filter(r=>r.situacao==='Ativo'||r.situacao==='Licença Maternidade').length}</div><div class="kpi-sub">ativo + lic. maternidade</div></div><div class="kpi"><div class="kpi-label">Afastados INSS</div><div class="kpi-val" style="color:#c0392b">${clt.filter(r=>r.situacao==='Afastado INSS').length}</div><div class="kpi-sub">benefício INSS</div></div><div class="kpi"><div class="kpi-label">Lic. Maternidade</div><div class="kpi-val" style="color:#8E44AD">${clt.filter(r=>r.situacao==='Licença Maternidade').length}</div><div class="kpi-sub">em licença</div></div>
     <div class="kpi"><div class="kpi-label">Prestadores PJ</div><div class="kpi-val">${pjList.length}</div></div>
     <div class="kpi"><div class="kpi-label">Massa salarial CLT</div><div class="kpi-val" style="font-size:15px">${R(sum(clt,'salarioBase'))}</div></div>
     <div class="kpi"><div class="kpi-label">FGTS mensal</div><div class="kpi-val" style="font-size:15px">${R(sum(enc,'fgtsTotal'))}</div></div>
@@ -570,9 +575,11 @@ function rAnual(el){
   const custoPJ=mesesAno.map(m=>sum(getMesData(m).pj,'honorarios'));
   const custoTermCLT=mesesAno.map(m=>sum(getMesData(m).terminos.filter(r=>r.tipoPessoa==='CLT'),'custoTotalCLT'));
   const custoTermPJ=mesesAno.map(m=>sum(getMesData(m).terminos.filter(r=>r.tipoPessoa==='PJ'),'custoTotalPJ'));
-  const headcount=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Ativo').length);
+    const headcount=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&(r.situacao==='Ativo'||r.situacao==='Licença Maternidade')).length);
+  const afastadosInss=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Afastado INSS').length);
+  const licMatern=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Licença Maternidade').length);
   const afastados=mesesAno.map(m=>getMesData(m).cadastro.filter(r=>r.tipoPessoa==='CLT'&&r.situacao==='Afastado').length);
-  const totalVinculos=mesesAno.map((m,i)=>headcount[i]+afastados[i]);
+  const totalVinculos=mesesAno.map((m,i)=>headcount[i]+afastadosInss[i]+afastados[i]);
   const admissoes=mesesAno.map((m,i)=>{
     if(i===0)return 0;
     const ant=getMesData(mesesAno[i-1]).cadastro.map(r=>r.matricula);
@@ -625,21 +632,23 @@ function rAnual(el){
   <div class="card"><div class="card-title">Composição de custo mensal</div><div class="chart-tall"><canvas id="an6"></canvas></div></div>
 
   <div class="card"><div class="card-title">Resumo mensal detalhado — ${anoSel}</div>
-  <div class="tbl-wrap"><table><thead><tr><th>Mês</th><th>Ativos</th><th>Afastados</th><th>Admissões</th><th>Saídas</th><th>Massa Salarial</th><th>FGTS</th><th>Custo PJ</th><th>Custo Términos</th><th>H. Extras</th><th>Faltas (dias)</th></tr></thead>
+  <div class="tbl-wrap"><table><thead><tr><th>Mês</th><th>Ativos efetivos</th><th>Afastados INSS</th><th>Lic. Maternidade</th><th>Afastados</th><th>Total</th><th>Admissões</th><th>Saídas</th><th>Massa Salarial</th><th>FGTS</th><th>Custo PJ</th><th>Custo Términos</th><th>H. Extras</th><th>Faltas (dias)</th></tr></thead>
   <tbody>${mesesAno.map((m,i)=>{
     const [y,mo]=m.split('-');
     const label=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(mo)-1];
-    return`<tr><td style="font-weight:500">${label}</td><td>${headcount[i]}</td><td style="color:#BA7517;font-weight:500">${afastados[i]}</td><td style="color:#1D9E75;font-weight:500">+${admissoes[i]}</td><td style="color:#c0392b;font-weight:500">-${saidas[i]}</td><td>${R(massaSal[i])}</td><td>${R(totalFGTS[i])}</td><td>${R(custoPJ[i])}</td><td style="color:#c0392b">${R(custoTermCLT[i]+custoTermPJ[i])}</td><td>${H(hExtras[i])}</td><td>${faltas[i]}</td></tr>`;
+    return`<tr><td style="font-weight:500">${label}</td><td>${headcount[i]}</td><td style="color:#c0392b;font-weight:500">${afastadosInss[i]}</td><td style="color:#8E44AD;font-weight:500">${licMatern[i]}</td><td style="color:#BA7517;font-weight:500">${afastados[i]}</td><td style="font-weight:500">${totalVinculos[i]}</td><td style="color:#1D9E75;font-weight:500">+${admissoes[i]}</td><td style="color:#c0392b;font-weight:500">-${saidas[i]}</td><td>${R(massaSal[i])}</td><td>${R(totalFGTS[i])}</td><td>${R(custoPJ[i])}</td><td style="color:#c0392b">${R(custoTermCLT[i]+custoTermPJ[i])}</td><td>${H(hExtras[i])}</td><td>${faltas[i]}</td></tr>`;
   }).join('')}
-  <tr style="font-weight:600;background:#fafaf8"><td>TOTAL</td><td>—</td><td>—</td><td style="color:#1D9E75">+${totalAdm}</td><td style="color:#c0392b">-${totalSai}</td><td>${R(totalMassaAno)}</td><td>${R(totalFGTS.reduce((s,v)=>s+v,0))}</td><td>${R(custoPJ.reduce((s,v)=>s+v,0))}</td><td style="color:#c0392b">${R(totalCustoTermAno)}</td><td>${H(totalHE)}</td><td>${faltas.reduce((s,v)=>s+v,0)}</td></tr>
+  <tr style="font-weight:600;background:#fafaf8"><td>TOTAL</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td style="color:#1D9E75">+${totalAdm}</td><td style="color:#c0392b">-${totalSai}</td><td>${R(totalMassaAno)}</td><td>${R(totalFGTS.reduce((s,v)=>s+v,0))}</td><td>${R(custoPJ.reduce((s,v)=>s+v,0))}</td><td style="color:#c0392b">${R(totalCustoTermAno)}</td><td>${H(totalHE)}</td><td>${faltas.reduce((s,v)=>s+v,0)}</td></tr>
   </tbody></table></div></div>`;
 
   // Charts
   lineChart('an1',labels,[{label:'Massa Salarial',data:massaSal,borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,.1)',tension:.3,pointRadius:4,fill:true}]);
   multiBarChart('an2',labels,[{label:'Massa Salarial',data:massaSal,backgroundColor:'#AFA9EC'},{label:'FGTS',data:totalFGTS,backgroundColor:'#5DCAA5'},{label:'Custo PJ',data:custoPJ,backgroundColor:'#F0997B'},{label:'Términos',data:custoTermCLT.map((v,i)=>v+custoTermPJ[i]),backgroundColor:'#E24B4A'}]);
   lineChart('an3',labels,[
-    {label:'Ativos',data:headcount,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.1)',tension:.3,pointRadius:4,fill:true},
-    {label:'Afastados',data:afastados,borderColor:'#F0997B',backgroundColor:'rgba(240,153,123,.1)',tension:.3,pointRadius:4,fill:false},
+    {label:'Ativos efetivos',data:headcount,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,.1)',tension:.3,pointRadius:4,fill:true},
+    {label:'Afastados INSS',data:afastadosInss,borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,.05)',tension:.3,pointRadius:4,fill:false},
+    {label:'Lic. Maternidade',data:licMatern,borderColor:'#8E44AD',backgroundColor:'rgba(142,68,173,.05)',tension:.3,pointRadius:4,fill:false},
+    {label:'Afastados',data:afastados,borderColor:'#F0997B',backgroundColor:'rgba(240,153,123,.05)',tension:.3,pointRadius:4,fill:false},
     {label:'Total vínculos',data:totalVinculos,borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,.05)',tension:.3,pointRadius:4,borderDash:[4,3],fill:false}
   ]);
   multiBarChart('an4',labels,[{label:'Admissões',data:admissoes,backgroundColor:'#1D9E75'},{label:'Saídas',data:saidas,backgroundColor:'#E24B4A'}]);
@@ -760,12 +769,17 @@ function rHeadcount(el){
   const clt=applyFilters(allCad,'headcount');
   const nAtivos=clt.filter(r=>r.situacao==='Ativo').length;
   const nAfastados=clt.filter(r=>r.situacao==='Afastado').length;
+  const nInss=clt.filter(r=>r.situacao==='Afastado INSS').length;
+  const nMatern=clt.filter(r=>r.situacao==='Licença Maternidade').length;
   const nTotal=clt.length;
+  const nAtivosEfetivos=nAtivos+nMatern; // Ativo + Licença Maternidade
   document.getElementById('hc-content').innerHTML=`
-  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);max-width:600px">
-    <div class="kpi"><div class="kpi-label">Ativos</div><div class="kpi-val" style="color:#1D9E75">${nAtivos}</div><div class="kpi-sub">em atividade normal</div></div>
-    <div class="kpi"><div class="kpi-label">Afastados</div><div class="kpi-val" style="color:#BA7517">${nAfastados}</div><div class="kpi-sub">licença / INSS</div></div>
-    <div class="kpi"><div class="kpi-label">Total vínculos CLT</div><div class="kpi-val">${nTotal}</div><div class="kpi-sub">ativos + afastados</div></div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+    <div class="kpi"><div class="kpi-label">Total vínculos CLT</div><div class="kpi-val">${nTotal}</div><div class="kpi-sub">todos os vínculos</div></div>
+    <div class="kpi"><div class="kpi-label">Ativos efetivos</div><div class="kpi-val" style="color:#1D9E75">${nAtivosEfetivos}</div><div class="kpi-sub">ativo + lic. maternidade</div></div>
+    <div class="kpi"><div class="kpi-label">Afastados</div><div class="kpi-val" style="color:#BA7517">${nAfastados}</div><div class="kpi-sub">afastamento geral</div></div>
+    <div class="kpi"><div class="kpi-label">Afastados INSS</div><div class="kpi-val" style="color:#c0392b">${nInss}</div><div class="kpi-sub">benefício INSS</div></div>
+    <div class="kpi"><div class="kpi-label">Licença Maternidade</div><div class="kpi-val" style="color:#8E44AD">${nMatern}</div><div class="kpi-sub">lic. maternidade</div></div>
   </div>
   <div class="flex-row"><input type="text" id="hcf" placeholder="Buscar nome..." style="width:250px" oninput="renderHcTable()"><select id="hcs" onchange="renderHcTable()" style="width:140px"><option value="">Todas situações</option><option>Ativo</option><option>Afastado</option></select></div>
   <div class="card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between"><span>Colaboradores — ${MES}</span><span style="font-size:11px;color:#999;font-weight:400">Clique em Editar para ajustar</span></div>
@@ -780,7 +794,7 @@ function renderHcTable(){
   const rows=(window._hcRows||[]).filter(r=>(!f||(r.nome+'|'+r.empregador+'|'+r.departamento).toLowerCase().includes(f))&&(!s||r.situacao===s));
   const tb=document.getElementById('hc-tbody');
   if(!tb)return;
-  tb.innerHTML=rows.map(r=>`<tr><td>${r.nome}</td><td class="mono">${r.matricula}</td><td>${r.cargo}</td><td>${r.departamento}</td><td style="font-size:11px">${r.centroCusto||'—'}</td><td>${(r.empregador||'').replace('Livance - ','')}</td><td>${r.dataAdmissao}</td><td style="font-weight:500">${R(r.salarioBase)}</td><td><span class="badge ${r.tipoPessoa==='PJ'?'b-teal':'b-info'}">${r.tipoPessoa||'CLT'}</span></td><td><span class="badge ${r.situacao==='Ativo'?'b-ok':r.situacao==='Afastado'?'b-warn':'b-err'}">${r.situacao}</span></td><td><button class="btn-sm" onclick="openEdit('${MES}','${r.matricula}')">Editar</button></td></tr>`).join('');
+  tb.innerHTML=rows.map(r=>`<tr><td>${r.nome}</td><td class="mono">${r.matricula}</td><td>${r.cargo}</td><td>${r.departamento}</td><td style="font-size:11px">${r.centroCusto||'—'}</td><td>${(r.empregador||'').replace('Livance - ','')}</td><td>${r.dataAdmissao}</td><td style="font-weight:500">${R(r.salarioBase)}</td><td><span class="badge ${r.tipoPessoa==='PJ'?'b-teal':'b-info'}">${r.tipoPessoa||'CLT'}</span></td><td><span class="badge ${r.situacao==='Ativo'?'b-ok':r.situacao==='Licença Maternidade'?'b-purple':r.situacao==='Afastado INSS'?'b-err':r.situacao==='Afastado'?'b-warn':'b-gray'}">${r.situacao}</span></td><td><button class="btn-sm" onclick="openEdit('${MES}','${r.matricula}')">Editar</button></td></tr>`).join('');
 }
 
 // ── EDIÇÃO ────────────────────────────────────────────────────────
@@ -906,7 +920,7 @@ function rImportar(el){
     ${['01 - Janeiro','02 - Fevereiro','03 - Março','04 - Abril','05 - Maio','06 - Junho','07 - Julho','08 - Agosto','09 - Setembro','10 - Outubro','11 - Novembro','12 - Dezembro'].map((l,i)=>{const v=String(i+1).padStart(2,'0');const cur=new Date().getMonth();return`<option value="${v}" ${i===cur?'selected':''}>${l}</option>`;}).join('')}
   </select>
   <select id="imp-mes-y" style="width:90px">
-    ${[2024,2025,2026,2027].map(y=>`<option value="${y}" ${y===new Date().getFullYear()?'selected':''}>${y}</option>`).join('')}
+    ${Array.from({length:17},(_,i)=>2024+i).map(y=>`<option value="${y}" ${y===new Date().getFullYear()?'selected':''}>${y}</option>`).join('')}
   </select>
   <span style="font-size:12px;color:#999">Os dados serão salvos no Google Sheets da Livance.</span></div></div>
   ${Object.entries(MODELOS).map(([k,m])=>`<div class="upload-block"><div class="upload-block-header"><div class="upload-block-left"><div class="num-badge">${m.num}</div><div><div style="font-size:13px;font-weight:500">${m.label}</div><div style="font-size:11px;color:#999;margin-top:1px">${m.sub}</div></div></div><button class="btn-tpl" onclick="downloadTemplate('${k}')">⬇ Baixar modelo .xlsx</button></div><div class="upload-zone ${F[k]?'done':''}" onclick="document.getElementById('fi-${k}').click()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${F[k]?'#1D9E75':'#bbb'}" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div><div style="font-size:12px;color:#555">${F[k]?F[k].name:'Clique para selecionar'}</div><div style="font-size:10px;color:#bbb;margin-top:2px">${F[k]?'✓ Carregado':'Formato .xlsx'}</div></div></div><input type="file" id="fi-${k}" accept=".xlsx" style="display:none" onchange="pickFile('${k}',this)"></div>`).join('')}
@@ -939,6 +953,11 @@ async function processImport(){
       const res=await apiCall('saveModule',{modulo:mods[k],mes,rows:parsed});
       if(!res.ok)throw new Error(`Erro em ${mods[k]}: ${res.error}`);
       results.push(`${parsed.length} ${mods[k]}`);
+      // If re-importing a previously deleted period, remove from blacklist
+      const _del=lsGet('rh_deleted')||{periods:[],modules:[]};
+      _del.periods=_del.periods.filter(p=>p!==mes);
+      _del.modules=_del.modules.filter(x=>x.mes!==mes);
+      lsSet('rh_deleted',_del);
       if(!DB[mes])DB[mes]={cadastro:[],encargos:[],terminos:[],pj:[],ponto:[]};
       DB[mes][mods[k]]=parsed;
     }
@@ -958,15 +977,27 @@ function rPeriodos(el){
 }
 async function confirmDeletePeriodo(mes){
   if(!confirm(`⚠ Excluir TODOS os dados de ${fmtMes(mes)}?`))return;
-  showSync(true);const res=await apiCall('deletePeriod',{mes});
+  showSync(true);
+  // Save to local blacklist immediately (persists across logins)
+  const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
+  if(!deleted.periods.includes(mes))deleted.periods.push(mes);
+  lsSet('rh_deleted',deleted);
+  const res=await apiCall('deletePeriod',{mes});
   if(res.ok){delete DB[mes];lsSet('rh_db_cache',DB);populateMesSel();const m=getMeses();MES=m.length?m[0]:'';}
-  else alert('Erro: '+res.error);showSync(false);rPeriodos(document.getElementById('pg'));
+  else alert('Erro ao excluir no servidor (período removido localmente): '+res.error);
+  showSync(false);rPeriodos(document.getElementById('pg'));
 }
 async function confirmDeleteModulo(mes,modulo,label){
   if(!confirm(`⚠ Excluir "${label}" de ${fmtMes(mes)}?`))return;
-  showSync(true);const res=await apiCall('deleteModule',{mes,modulo});
+  showSync(true);
+  // Save to local blacklist immediately
+  const deleted=lsGet('rh_deleted')||{periods:[],modules:[]};
+  if(!deleted.modules.find(x=>x.mes===mes&&x.modulo===modulo))deleted.modules.push({mes,modulo});
+  lsSet('rh_deleted',deleted);
+  const res=await apiCall('deleteModule',{mes,modulo});
   if(res.ok){if(DB[mes])DB[mes][modulo]=[];lsSet('rh_db_cache',DB);}
-  else alert('Erro: '+res.error);showSync(false);rPeriodos(document.getElementById('pg'));
+  else alert('Erro ao excluir no servidor (módulo removido localmente): '+res.error);
+  showSync(false);rPeriodos(document.getElementById('pg'));
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────
